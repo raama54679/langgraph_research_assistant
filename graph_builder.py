@@ -27,8 +27,8 @@ tavily = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
 def plan_node(state: dict) -> dict:
     topic = state["topic"]
     msgs = [
-        SystemMessage(content="You are a research assistant mean to answer complex questions with high levels of detail and accuracy.."),
-        HumanMessage(content=f"Break this topic into 3 insightful research questions:\n\n{topic}")
+        SystemMessage(content="You are a research assistant meant to answer complex questions with high levels of detail and accuracy. You must prioritize the most recent data and have full access to the internet."),
+        HumanMessage(content=f"Break this topic into 5 insightful research questions:\n\n{topic}")
     ]
     output = groq_llm.invoke(msgs).content
     state["sub_questions"] = [line.strip(" -•\n") for line in output.strip().split("\n") if line.strip()]
@@ -39,14 +39,17 @@ def search_node(state: dict) -> dict:
     for q in state["sub_questions"]:
         try:
             short_q = summarize_question(q)
-            resp = tavily.search(short_q, search_depth="advanced", include_answers=False)
+            resp = tavily.search(short_q, search_depth="advanced", include_answers=True)
             urls = [r["url"] for r in resp["results"][:3]]
             results.append({"question": q, "urls": urls})
         except Exception as e:
             print(f"Search failed for question: {q[:100]}... Error: {e}")
             results.append({"question": q, "urls": []})
+
     state["search_results"] = results
+    state["retry_search"] = any(len(group["urls"]) == 0 for group in results)
     return state
+
 
 
 def retrieve_node(state: dict) -> dict:
@@ -56,7 +59,7 @@ def retrieve_node(state: dict) -> dict:
         for url in item["urls"]:
             try:
                 text += f"\n[From {url}]\n"
-                content = tavily.extract_content(url).get("content", "")[:1000]
+                content = tavily.extract_content(url).get("content", "")
                 text += content
             except:
                 continue
@@ -108,7 +111,7 @@ def build_graph():
 
     builder.set_entry_point("PLAN")
     builder.add_edge("PLAN", "SEARCH")
-    builder.add_edge("SEARCH", "RETRIEVE")
+    builder.add_conditional_edges("SEARCH", lambda s: "SEARCH" if s["retry_search"] else "RETRIEVE")
     builder.add_edge("RETRIEVE", "SYNTHESIZE")
     builder.add_edge("SYNTHESIZE", "SUMMARY")
     builder.add_edge("SUMMARY", "REPORT")
