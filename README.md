@@ -119,9 +119,7 @@ The app collects the top 3 URLs for each sub-question from Tavily's search engin
 
 👩‍💻 Created By
 
-*Raama Katragadda*
-*Ushmitha Annapaneni*  
-*Vedasri Narla*
+*Raama Katragadda, Ushmitha Annapaneni, Vedasri Narla*
 If you found this project helpful, feel free to star ⭐ or fork 🍴 it on GitHub!
 
 ---
